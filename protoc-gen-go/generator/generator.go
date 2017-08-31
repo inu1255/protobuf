@@ -1323,6 +1323,7 @@ func (g *Generator) generateImports() {
 	g.P("import " + g.Pkg["proto"] + " " + strconv.Quote(g.ImportPrefix+"github.com/golang/protobuf/proto"))
 	g.P("import " + g.Pkg["fmt"] + ` "fmt"`)
 	g.P("import " + g.Pkg["math"] + ` "math"`)
+	g.P("import " + g.Pkg["bson"] + " " + strconv.Quote(g.ImportPrefix+"gopkg.in/mgo.v2/bson"))
 	for i, s := range g.file.Dependency {
 		fd := g.fileByName(s)
 		// Do not import our own package.
@@ -1784,6 +1785,10 @@ func (g *Generator) generateMessage(message *Descriptor) {
 		typename, wiretype := g.GoType(message, field)
 		jsonName := *field.Name
 		tag := fmt.Sprintf("protobuf:%s json:%q", g.goTag(message, field, wiretype), jsonName+",omitempty")
+		if jsonName == "id" && typename == "string" {
+			tag += ` bson:"_id"`
+			typename = "bson.ObjectId"
+		}
 
 		fieldNames[field] = fieldName
 		fieldGetterNames[field] = fieldGetterName
@@ -2140,7 +2145,11 @@ func (g *Generator) generateMessage(message *Descriptor) {
 				g.P("if m != nil && m." + fname + " != nil {")
 			}
 			g.In()
-			g.P("return " + star + "m." + fname)
+			if fname == "Id" && typename == "string" {
+				g.P("return string(" + star + "m." + fname + ")")
+			} else {
+				g.P("return " + star + "m." + fname)
+			}
 			g.Out()
 			g.P("}")
 		} else {
